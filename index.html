@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Undangan Massal Tia & Denni</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fdfaf5;
+            color: #5d5d5d;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            border: 1px solid #eee;
+        }
+        h1 { color: #333; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; text-align: left; }
+        .input-textarea {
+            width: 100%; height: 150px; padding: 12px; margin-bottom: 20px;
+            border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;
+            font-size: 16px; resize: vertical;
+        }
+        .btn {
+            display: block; width: 100%; padding: 12px; border: none;
+            border-radius: 8px; font-size: 16px; font-weight: bold;
+            cursor: pointer; margin-bottom: 10px; transition: background-color 0.3s ease;
+        }
+        .btn:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .btn-generate { background-color: #8a8a8a; color: white; }
+        .btn-generate:hover:not(:disabled) { background-color: #7a7a7a; }
+        .btn-export { background-color: #1D6F42; color: white; }
+        .btn-export:hover { background-color: #185a35; }
+        .action-buttons { display: none; margin-top: 20px; }
+        #results-container { margin-top: 30px; text-align: left; }
+        .result-item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .result-item h4 { margin-top: 0; color: #333; }
+        .result-item textarea {
+            width: 100%; height: 250px; padding: 10px; border-radius: 6px; /* Tinggikan textarea agar muat */
+            border: 1px solid #ccc; box-sizing: border-box; font-family: inherit;
+            font-size: 14px; resize: vertical;
+        }
+        .btn-copy-single {
+            background-color: #f0f0f0; color: #333; width: auto; display: inline-block;
+            padding: 8px 16px; margin-top: 10px;
+        }
+        .btn-copy-single:hover { background-color: #e0e0e0; }
+        .copy-notification {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background-color: #333; color: white; padding: 10px 20px;
+            border-radius: 5px; display: none; z-index: 1000;
+        }
+        .results-header {
+            display: none; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Generator Undangan Massal</h1>
+        <label for="guestList">Daftar Nama Tamu (satu nama per baris):</label>
+        <textarea id="guestList" class="input-textarea" placeholder="Bapak Budi Santoso dan Keluarga&#10;Dr. Sarah Amelia&#10;Anton & Partner"></textarea>
+        <button id="generateBtn" class="btn btn-generate">Generate Semua Undangan</button>
+        <div id="results-container">
+            <div class="results-header" id="resultsHeader">
+                <h3>Hasil Generate</h3>
+                <span id="guestCount"></span>
+            </div>
+            <div id="resultsList"></div>
+            <div class="action-buttons" id="actionButtons">
+                <button id="exportBtn" class="btn btn-export">✔️ Export to Excel (.csv)</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="copyNotice" class="copy-notification">Teks berhasil disalin!</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let generatedData = [];
+            const generateBtn = document.getElementById('generateBtn');
+            const guestListInput = document.getElementById('guestList');
+            const resultsList = document.getElementById('resultsList');
+            const resultsHeader = document.getElementById('resultsHeader');
+            const guestCount = document.getElementById('guestCount');
+            const actionButtons = document.getElementById('actionButtons');
+            const exportBtn = document.getElementById('exportBtn');
+            const copyNotice = document.getElementById('copyNotice');
+
+            // --- FUNGSI UTAMA GENERATE ---
+            generateBtn.addEventListener('click', function() {
+                const guestNames = guestListInput.value.trim().split('\n').filter(name => name.trim() !== '');
+                if (guestNames.length === 0) {
+                    alert("Harap masukkan daftar nama tamu terlebih dahulu.");
+                    return;
+                }
+                
+                generateBtn.disabled = true;
+                generateBtn.textContent = 'Memproses...';
+                resultsList.innerHTML = '';
+                generatedData = [];
+                
+                guestNames.forEach((guestName, index) => {
+                    guestName = guestName.trim();
+                    const encodedGuestName = guestName.replace(/ /g, "+");
+                    const generatedLink = `https://hi.wekita.co.id/tia-denni/?to=${encodedGuestName}`;
+                    const invitationMessage = createInvitationMessage(guestName, generatedLink);
+                    
+                    generatedData.push({ name: guestName, message: invitationMessage, link: generatedLink });
+                    displayResultItem(index, guestName, invitationMessage);
+                });
+                
+                guestCount.textContent = `(${guestNames.length} Undangan)`;
+                resultsHeader.style.display = 'flex';
+                actionButtons.style.display = 'block';
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Semua Undangan';
+            });
+
+            // --- FUNGSI EXPORT ---
+            exportBtn.addEventListener('click', function() {
+                if (generatedData.length === 0) { return; }
+                let csvContent = '"Nama Tamu","Template Undangan","Link Undangan"\n';
+                generatedData.forEach(item => {
+                    const name = `"${item.name.replace(/"/g, '""')}"`;
+                    const message = `"${item.message.replace(/"/g, '""')}"`;
+                    const link = `"${item.link.replace(/"/g, '""')}"`;
+                    csvContent += `${name},${message},${link}\n`;
+                });
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "daftar_undangan_tia_denni.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            // --- FUNGSI BANTUAN ---
+            
+            // >> PERUBAHAN UTAMA ADA DI SINI <<
+            function createInvitationMessage(guestName, generatedLink) {
+                // Template pesan kini menggunakan Gaya Elegan & Puitis
+                return `Assalamu'alaikum Warahmatullahi Wabarakatuh
+Bismillahirahmanirrahim.
+
+Yth. ${guestName}
+
+_"Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu isteri-isteri dari jenismu sendiri, supaya kamu cenderung dan merasa tenteram kepadanya, dan dijadikan-Nya diantaramu rasa kasih dan sayang."_
+(QS. Ar-Rum: 21)
+
+Maha Suci Allah yang telah menautkan dua hati dalam ikatan suci pernikahan. Dengan penuh rasa syukur, kami ingin membagi momen bahagia ini seraya memohon doa restu dari Bapak/Ibu/Saudara/i untuk menghadiri perayaan cinta kasih kami:
+
+*Tia & Denni*
+
+Sebuah kehormatan bagi kami untuk menyambut Anda di hari istimewa kami. Silakan simpan tanggalnya dan lihat detail cerita kami pada tautan undangan berikut:
+
+${generatedLink}
+
+Doa restu Anda adalah anugerah terindah bagi kami di awal perjalanan hidup yang baru ini. Terima kasih atas perhatian Anda.
+
+Wassalamu'alaikum Warahmatullahi Wabarakatuh
+
+Dengan cinta,
+*sTia & Denni*`;
+            }
+
+            function displayResultItem(index, guestName, invitationMessage) {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                resultItem.innerHTML = `<h4>${index + 1}. Undangan untuk: ${guestName}</h4><textarea readonly>${invitationMessage}</textarea><button class="btn btn-copy-single">Copy Pesan Ini</button>`;
+                resultsList.appendChild(resultItem);
+                resultItem.querySelector('.btn-copy-single').addEventListener('click', function() {
+                    copyToClipboard(this.previousElementSibling);
+                });
+            }
+
+            function copyToClipboard(textareaElement) {
+                textareaElement.select();
+                document.execCommand('copy');
+                copyNotice.style.display = 'block';
+                setTimeout(() => { copyNotice.style.display = 'none'; }, 2000);
+            }
+        });
+    </script>
+
+</body>
+</html>
