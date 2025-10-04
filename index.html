@@ -33,22 +33,31 @@
             border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;
             font-size: 16px; resize: vertical;
         }
+        /* -- Style untuk Kontainer Tombol Generate -- */
+        .generation-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
         .btn {
             display: block; width: 100%; padding: 12px; border: none;
             border-radius: 8px; font-size: 16px; font-weight: bold;
-            cursor: pointer; margin-bottom: 10px; transition: background-color 0.3s ease;
+            cursor: pointer; transition: background-color 0.3s ease;
         }
         .btn:disabled { background-color: #cccccc; cursor: not-allowed; }
         .btn-generate { background-color: #8a8a8a; color: white; }
         .btn-generate:hover:not(:disabled) { background-color: #7a7a7a; }
-        .btn-export { background-color: #1D6F42; color: white; }
+        /* -- Style untuk Tombol Instagram Baru -- */
+        .btn-instagram { background-color: #C13584; color: white; }
+        .btn-instagram:hover:not(:disabled) { background-color: #A32B6F; }
+        .btn-export { background-color: #1D6F42; color: white; margin-bottom: 10px; }
         .btn-export:hover { background-color: #185a35; }
         .action-buttons { display: none; margin-top: 20px; }
         #results-container { margin-top: 30px; text-align: left; }
         .result-item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
         .result-item h4 { margin-top: 0; color: #333; }
         .result-item textarea {
-            width: 100%; height: 250px; padding: 10px; border-radius: 6px; /* Tinggikan textarea agar muat */
+            width: 100%; height: 250px; padding: 10px; border-radius: 6px;
             border: 1px solid #ccc; box-sizing: border-box; font-family: inherit;
             font-size: 14px; resize: vertical;
         }
@@ -75,7 +84,11 @@
         <h1>Tia dan Denni</h1>
         <label for="guestList">Daftar Nama Tamu (satu nama per baris):</label>
         <textarea id="guestList" class="input-textarea" placeholder="Bapak Budi Santoso dan Keluarga&#10;Dr. Sarah Amelia&#10;Anton & Partner"></textarea>
-        <button id="generateBtn" class="btn btn-generate">Generate Semua Undangan</button>
+        
+        <div class="generation-buttons">
+            <button id="generateWaBtn" class="btn btn-generate">Generate (WhatsApp)</button>
+            <button id="generateIgBtn" class="btn btn-instagram">Generate (Instagram)</button>
+        </div>
         <div id="results-container">
             <div class="results-header" id="resultsHeader">
                 <h3>Hasil Generate</h3>
@@ -93,7 +106,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             let generatedData = [];
-            const generateBtn = document.getElementById('generateBtn');
+            // === PERUBAHAN JAVASCRIPT: Mengambil ID Tombol Baru ===
+            const generateWaBtn = document.getElementById('generateWaBtn');
+            const generateIgBtn = document.getElementById('generateIgBtn');
             const guestListInput = document.getElementById('guestList');
             const resultsList = document.getElementById('resultsList');
             const resultsHeader = document.getElementById('resultsHeader');
@@ -102,16 +117,21 @@
             const exportBtn = document.getElementById('exportBtn');
             const copyNotice = document.getElementById('copyNotice');
 
-            // --- FUNGSI UTAMA GENERATE ---
-            generateBtn.addEventListener('click', function() {
+            // === FUNGSI UTAMA GENERATE (TELAH DIMODIFIKASI) ===
+            // Fungsi ini sekarang menerima 'templateFunction' sebagai argumen
+            function generateInvitations(templateFunction, buttonText) {
                 const guestNames = guestListInput.value.trim().split('\n').filter(name => name.trim() !== '');
                 if (guestNames.length === 0) {
                     alert("Harap masukkan daftar nama tamu terlebih dahulu.");
                     return;
                 }
                 
-                generateBtn.disabled = true;
-                generateBtn.textContent = 'Memproses...';
+                // Menonaktifkan kedua tombol saat proses berjalan
+                generateWaBtn.disabled = true;
+                generateIgBtn.disabled = true;
+                generateWaBtn.textContent = 'Memproses...';
+                generateIgBtn.textContent = 'Memproses...';
+                
                 resultsList.innerHTML = '';
                 generatedData = [];
                 
@@ -119,7 +139,9 @@
                     guestName = guestName.trim();
                     const encodedGuestName = guestName.replace(/ /g, "+");
                     const generatedLink = `https://invitation.mdenniandrian.my.id/?to=${encodedGuestName}`;
-                    const invitationMessage = createInvitationMessage(guestName, generatedLink);
+                    
+                    // Menggunakan fungsi template yang dikirim sebagai argumen
+                    const invitationMessage = templateFunction(guestName, generatedLink);
                     
                     generatedData.push({ name: guestName, message: invitationMessage, link: generatedLink });
                     displayResultItem(index, guestName, invitationMessage);
@@ -128,11 +150,25 @@
                 guestCount.textContent = `(${guestNames.length} Undangan)`;
                 resultsHeader.style.display = 'flex';
                 actionButtons.style.display = 'block';
-                generateBtn.disabled = false;
-                generateBtn.textContent = 'Generate Semua Undangan';
+                
+                // Mengaktifkan kembali kedua tombol
+                generateWaBtn.disabled = false;
+                generateIgBtn.disabled = false;
+                generateWaBtn.textContent = 'Generate (WhatsApp)';
+                generateIgBtn.textContent = 'Generate (Instagram)';
+            }
+
+            // Event listener untuk tombol WhatsApp
+            generateWaBtn.addEventListener('click', function() {
+                generateInvitations(createWhatsappMessage);
             });
 
-            // --- FUNGSI EXPORT ---
+            // Event listener untuk tombol Instagram
+            generateIgBtn.addEventListener('click', function() {
+                generateInvitations(createInstagramMessage);
+            });
+
+            // --- FUNGSI EXPORT (Tidak ada perubahan) ---
             exportBtn.addEventListener('click', function() {
                 if (generatedData.length === 0) { return; }
                 let csvContent = '"Nama Tamu","Template Undangan","Link Undangan"\n';
@@ -143,7 +179,7 @@
                     csvContent += `${name},${message},${link}\n`;
                 });
 
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' }); // \uFEFF for BOM
                 const link = document.createElement("a");
                 const url = URL.createObjectURL(blob);
                 link.setAttribute("href", url);
@@ -154,11 +190,10 @@
                 document.body.removeChild(link);
             });
 
-            // --- FUNGSI BANTUAN ---
+            // --- FUNGSI TEMPLATE PESAN ---
             
-            // >> PERUBAHAN UTAMA ADA DI SINI <<
-            function createInvitationMessage(guestName, generatedLink) {
-                // Template pesan kini menggunakan Gaya Elegan & Puitis
+            // 1. Template untuk WhatsApp (nama diubah dari createInvitationMessage)
+            function createWhatsappMessage(guestName, generatedLink) {
                 return `*Assalamu'alaikum Warahmatullahi Wabarakatuh*
 *بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ*
 
@@ -182,6 +217,32 @@ Doa restu Bapak/Ibu/Saudara/i adalah anugerah terindah bagi kami di awal perjala
 Dengan cinta,
 *Tia & Denni*`;
             }
+            
+            // 2. === TEMPLATE BARU UNTUK INSTAGRAM ===
+            function createInstagramMessage(guestName, generatedLink) {
+                return `*Assalamu'alaikum Warahmatullahi Wabarakatuh*
+*بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ*
+
+Yth. *${guestName}*
+
+Maha Suci Allah yang telah menautkan dua hati dalam ikatan suci pernikahan. Dengan penuh rasa syukur, kami ingin membagi momen bahagia ini seraya memohon doa restu dari Bapak/Ibu/Saudara/i untuk menghadiri perayaan cinta kasih kami:
+
+_*Tia & Denni*_
+
+Sebuah kehormatan bagi kami untuk menyambut Bapak/Ibu/Saudara/i di hari istimewa kami. Silakan simpan tanggalnya dan lihat detail cerita kami pada tautan undangan berikut:
+
+${generatedLink}
+
+Doa restu Bapak/Ibu/Saudara/i adalah anugerah terindah bagi kami di awal perjalanan hidup yang baru ini. Terima kasih atas perhatian Anda.
+
+*Wassalamu'alaikum Warahmatullahi Wabarakatuh*
+
+Dengan cinta,
+*Tia & Denni*`;
+            }
+
+
+            // --- FUNGSI BANTUAN (Tidak ada perubahan) ---
 
             function displayResultItem(index, guestName, invitationMessage) {
                 const resultItem = document.createElement('div');
@@ -203,10 +264,4 @@ Dengan cinta,
     </script>
 
 </body>
-
 </html>
-
-
-
-
-
